@@ -33,7 +33,7 @@ Vec3f crossProduct(const Vec3f vector1, const Vec3f vector2){
     return cross_product;
 }
 
-Vec3f subtract_vectors(const Vec3f vector1, const Vec3f vector2){
+Vec3f subtractVectors(const Vec3f vector1, const Vec3f vector2){
     Vec3f subtracted_vector = {vector1.x-vector2.x, vector1.y-vector2.y, vector1.z-vector2.z};
     return subtracted_vector;
 }
@@ -50,10 +50,51 @@ Ray createRay(int i, int j, const Camera &camera, Vec3f image_top_left, float px
     pixel_position.z = image_top_left.z + (normalized_camera_u.z*u_offset) - (normalized_camera_v.z*v_offset);
 
     ray.origin = camera.position;
-    ray.direction = normalization(subtract_vectors(pixel_position, camera.position));
+    ray.direction = normalization(subtractVectors(pixel_position, camera.position));
     
     return ray;
 }
+
+vector<Vec3f> calculateTrianglesNormalVectors(const Scene &scene){
+    vector<Vec3f> triange_normal_vectors;
+    int number_of_triangles = scene.triangles.size();
+    Triangle current_triangle;
+    Vec3f v0, v1, v2;
+    for(int triangle_index=0; triangle_index<number_of_triangles; triangle_index++){
+        current_triangle = scene.triangles[triangle_index];
+        v0 = scene.vertex_data[current_triangle.indices.v0_id - 1];
+        v1 = scene.vertex_data[current_triangle.indices.v1_id - 1];
+        v2 = scene.vertex_data[current_triangle.indices.v2_id - 1];
+        Vec3f normal_vector = normalization(crossProduct(subtractVectors(v1, v0), subtractVectors(v2, v0)));
+        triange_normal_vectors.push_back(normal_vector);
+    }
+    return triange_normal_vectors;
+}
+
+vector<vector<Vec3f>> calculateMeshesNormalVectors(const Scene &scene){
+    vector<vector<Vec3f>> mesh_normal_vectors;
+    vector<Vec3f> face_normal_vector;
+    int number_of_meshes = scene.meshes.size();
+    Mesh current_mesh;
+    Vec3f v0, v1, v2;
+    // FOR EACH MESH
+    for(int mesh_index=0; mesh_index<number_of_meshes; mesh_index++){
+        current_mesh = scene.meshes[mesh_index];
+        int number_of_faces = current_mesh.faces.size();
+        // FOR EACH FACE IN Current Mesh
+        for(int face_index=0; face_index<number_of_faces; face_index++){
+            Face current_face = current_mesh.faces[face_index];
+            v0 = scene.vertex_data[current_face.v0_id - 1];
+            v1 = scene.vertex_data[current_face.v1_id - 1];
+            v2 = scene.vertex_data[current_face.v2_id - 1];
+            Vec3f normal_vector = normalization(crossProduct(subtractVectors(v1, v0), subtractVectors(v2, v0)));
+            face_normal_vector.push_back(normal_vector);
+        }
+        mesh_normal_vectors.push_back(face_normal_vector);
+    }
+    return mesh_normal_vectors;
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -64,6 +105,8 @@ int main(int argc, char* argv[])
     //std::cout<<scene.cameras[0].position.x<<std::endl;
 
     int camera_number = scene.cameras.size();
+    vector<Vec3f> triangle_normal_vectors = calculateTrianglesNormalVectors(scene);
+    vector<vector<Vec3f>> mesh_normal_vectors = calculateMeshesNormalVectors(scene);
 
     // FOR EACH CAMERA
     for(int camera_index=0; camera_index<camera_number; camera_index++){

@@ -157,8 +157,8 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
         Vec3f v1 = scene.vertex_data[current_triangle.indices.v1_id - 1];
         Vec3f v2 = scene.vertex_data[current_triangle.indices.v2_id - 1];
 
-        Hit hit;
-        hit.isHit = true;
+        Hit tri_hit;
+        tri_hit.isHit = true;
 
         Vec3f o = ray.origin;
         Vec3f d = ray.direction;
@@ -179,33 +179,34 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                 if(beta >= 0 && beta <= 1){
                     float gamma = calculateDeterminant(a_minus_b, a_minus_o, d) / detA;
                     if(gamma >= 0 && gamma <= 1-beta){
-                        hit.t = t;
-                        hit.intersection_point.x = o.x + t*d.x;
-                        hit.intersection_point.y = o.y + t*d.y;
-                        hit.intersection_point.z = o.z + t*d.z;
-                        hit.normal_vector = triange_normal_vectors[triangle_index];
-                        hit.material_id = current_triangle.material_id;
-                        hit.object_id = triangle_index;
+                        cout << "triangle hit" << endl;
+                        tri_hit.t = t;
+                        tri_hit.intersection_point.x = o.x + t*d.x;
+                        tri_hit.intersection_point.y = o.y + t*d.y;
+                        tri_hit.intersection_point.z = o.z + t*d.z;
+                        tri_hit.normal_vector = triange_normal_vectors[triangle_index];
+                        tri_hit.material_id = current_triangle.material_id;
+                        tri_hit.object_id = triangle_index;
                     }
                     else{
-                        hit.isHit=false;
+                        tri_hit.isHit=false;
                     }
                 }
                 else{
-                    hit.isHit=false;
+                    tri_hit.isHit=false;
                 }
             }
             else{
-                hit.isHit=false;
+                tri_hit.isHit=false;
             }
         }
 
         else{
-            hit.isHit=false;
+            tri_hit.isHit=false;
         }
 
-        if(hit.isHit && hit.t >= 0){
-            all_hits.push_back(hit);
+        if(tri_hit.isHit && tri_hit.t >= 0){
+            all_hits.push_back(tri_hit);
         }
         
     }
@@ -217,7 +218,7 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
         Vec3f center = scene.vertex_data[current_sphere.center_vertex_id - 1];
         float radius = current_sphere.radius;
 
-        Hit hit;
+        Hit sphere_hit;
 
         const float A = dotProduct(ray.direction, ray.direction);
         Vec3f e_minus_c = subtractVectors(ray.origin, center);
@@ -226,30 +227,30 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
 
         vector<float> roots = findRoots(A, B, C);
         if(roots.size() > 1){	
-            hit.isHit = true;
+            sphere_hit.isHit = true;
 
             const float t1 = roots[1];
             const float t2 = roots[2];
 
-            hit.material_id = current_sphere.material_id;
+            sphere_hit.material_id = current_sphere.material_id;
             
             //hit.objType = SPHERE;
-            hit.object_id = sphere_index;
+            sphere_hit.object_id = sphere_index;
 
             const float t = (t1 < t2) ? t1 : t2;
-            hit.intersection_point.x = ray.origin.x + t*ray.direction.x;
-            hit.intersection_point.y = ray.origin.y + t*ray.direction.y;
-            hit.intersection_point.z = ray.origin.z + t*ray.direction.z;
-            hit.normal_vector = normalization(subtractVectors(hit.intersection_point, center)); //can be optimized with radius
+            sphere_hit.intersection_point.x = ray.origin.x + t*ray.direction.x;
+            sphere_hit.intersection_point.y = ray.origin.y + t*ray.direction.y;
+            sphere_hit.intersection_point.z = ray.origin.z + t*ray.direction.z;
+            sphere_hit.normal_vector = normalization(subtractVectors(sphere_hit.intersection_point, center)); //can be optimized with radius
 
-            hit.t = t;
+            sphere_hit.t = t;
         }
         else{
-            hit.isHit = false;
+            sphere_hit.isHit = false;
         }
 
-        if(hit.isHit && hit.t >= 0){
-            all_hits.push_back(hit);
+        if(sphere_hit.isHit && sphere_hit.t >= 0){
+            all_hits.push_back(sphere_hit);
         }
     }
 
@@ -330,7 +331,7 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                 all_mesh_hits.push_back(face_hit);
             }
         }
-
+        //cout << "all mesh hits size: " << all_mesh_hits.size() << endl;
         mesh_hit = findClosestHit(all_mesh_hits);
 
         if(mesh_hit.isHit && mesh_hit.t >= 0){
@@ -338,7 +339,7 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
         }
     }
 
-
+    //cout << "all hits size: " << all_hits.size() << endl;
     Hit hitResult = findClosestHit(all_hits);
 
     return hitResult;
@@ -394,6 +395,21 @@ int main(int argc, char* argv[])
             for(int j=0; j<camera.image_width; j++){
                 Ray ray = createRay(i, j, camera, image_top_left, px, py, normalized_camera_u, normalized_camera_v);
                 Hit hit = operateHit(scene, ray, triangle_normal_vectors, mesh_normal_vectors);
+
+                Vec3f pixel_value;
+
+                if(hit.isHit){
+                    cout<<"hit"<<endl;
+                    pixel_value={255,255,255};
+                }
+                else{
+                    pixel_value={0,0,0};
+                }
+
+                image[pixel_index] = pixel_value.x;
+                image[pixel_index+1] = pixel_value.y;
+                image[pixel_index+2] = pixel_value.z;
+                pixel_index += 3;
             }
         }
 

@@ -34,8 +34,11 @@ Vec3f crossProduct(const Vec3f vector1, const Vec3f vector2){
     return cross_product;
 }
 
-Vec3f subtractVectors(const Vec3f vector1, const Vec3f vector2){
-    Vec3f subtracted_vector = {vector1.x-vector2.x, vector1.y-vector2.y, vector1.z-vector2.z};
+Vec3f subtractVectors(const Vec3f &vector1, const Vec3f &vector2){
+    Vec3f subtracted_vector;
+    subtracted_vector.x = vector1.x-vector2.x;
+    subtracted_vector.y = vector1.y-vector2.y;
+    subtracted_vector.z = vector1.z-vector2.z;
     return subtracted_vector;
 }
 
@@ -52,7 +55,6 @@ Ray createRay(int i, int j, const Camera &camera, Vec3f image_top_left, float px
 
     ray.origin = camera.position;
     ray.direction = normalization(subtractVectors(pixel_position, camera.position));
-    
     return ray;
 }
 
@@ -114,13 +116,15 @@ vector<float> findRoots(float A, float B, float C){
     return roots;
 }
 
-float calculateDeterminant(const Vec3f vector1, const Vec3f vector2, const Vec3f vector3){
-    float determinant = (vector1.x * (vector2.y*vector3.z - vector3.y*vector2.z)) + (vector1.y * (vector3.x*vector2.z - vector2.x*vector3.z)) + (vector1.z * (vector2.x*vector3.y - vector2.y*vector3.x));
+float calculateDeterminant(const Vec3f &vector1, const Vec3f &vector2, const Vec3f &vector3){
+    
+    float determinant = (vector1.x * (vector2.y*vector3.z - vector3.y*vector2.z)) + (vector1.y * (vector3.x*vector2.z - vector2.x*vector3.z)) + (vector1.z * (vector2.x*vector3.y - vector2.y*vector3.x));    
     return determinant;
 }
 
 Hit findClosestHit(vector<Hit> &all_hits){
     Hit closest_hit;
+
     int number_of_hits = all_hits.size();
     if(number_of_hits > 0){
         closest_hit.isHit = true;
@@ -134,6 +138,7 @@ Hit findClosestHit(vector<Hit> &all_hits){
     else{
         closest_hit.isHit = false;
     }
+    
     return closest_hit;
 }
 
@@ -168,11 +173,11 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
         Vec3f a_minus_o = subtractVectors(v0, o);
 
         float t;
-
         float detA = calculateDeterminant(a_minus_b, a_minus_c, d);
-        
 
+        
         if(detA != 0.0){
+            cout << detA << endl;
             t = calculateDeterminant(a_minus_b, a_minus_c, a_minus_o) / detA;
             if(t>0){
                 float beta = calculateDeterminant(a_minus_o, a_minus_c, d) / detA;

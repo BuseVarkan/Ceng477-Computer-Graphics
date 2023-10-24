@@ -12,6 +12,7 @@ typedef unsigned char RGB[3];
 typedef struct Ray{
     Vec3f origin;
     Vec3f direction;
+    bool isShadow;
 } ray;
 
 typedef struct Hit{
@@ -56,6 +57,7 @@ Ray createRay(int i, int j, const Camera &camera, Vec3f image_top_left, float px
 
     ray.origin = camera.position;
     ray.direction = normalization(subtractVectors(pixel_position, camera.position));
+    ray.isShadow = false;
     return ray;
 }
 
@@ -191,6 +193,9 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                         tri_hit.normal_vector = triange_normal_vectors[triangle_index];
                         tri_hit.material_id = current_triangle.material_id;
                         tri_hit.object_id = triangle_index;
+                        if((ray.isShadow == true)&& (tri_hit.t > 0) && (tri_hit.t < 1)){
+                            return tri_hit;
+                        }
                     }
                     else{
                         tri_hit.isHit=false;
@@ -248,6 +253,9 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
             sphere_hit.normal_vector = normalization(subtractVectors(sphere_hit.intersection_point, center)); //can be optimized with radius
 
             sphere_hit.t = t;
+            if((ray.isShadow == true) && (sphere_hit.t > 0) && (sphere_hit.t < 1)){
+                return sphere_hit;
+            }
         }
         else{
             sphere_hit.isHit = false;
@@ -304,6 +312,9 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                             face_hit.normal_vector = mesh_normal_vectors[mesh_index][face_index];
                             face_hit.material_id = current_triangle.material_id;
                             face_hit.object_id = mesh_index;
+                            if((ray.isShadow == true) && (face_hit.t > 0) && (face_hit.t < 1)){
+                                return face_hit;
+                            }
                         }
                         else{
                             face_hit.isHit=false;
@@ -425,23 +436,25 @@ int main(int argc, char* argv[])
                         Ray shadow_ray;
                         shadow_ray.origin = hit_point;
                         shadow_ray.direction = light_direction;
+                        shadow_ray.isShadow = true;
                         Hit shadow_hit = operateHit(scene, shadow_ray, triangle_normal_vectors, mesh_normal_vectors);
                         if(shadow_hit.isHit){
                             if(shadow_hit.t > 0 && shadow_hit.t < 1){
                                 // shadow
-                                cout << "shadow" << endl;
-                                // to see shadow, make it red
-                                pixel_value = {255,0,0};
+                                
                             }
                             else{
                                 // no shadow
-                                cout << "no shadow" << endl;
-                                pixel_value={255,255,255};
+                                pixel_value.x += scene.materials[hit.material_id - 1].diffuse.x * light_intensity.x * max(0.0f, dotProduct(normal_vector, light_direction));
+                                pixel_value.y += scene.materials[hit.material_id - 1].diffuse.y * light_intensity.y * max(0.0f, dotProduct(normal_vector, light_direction));
+                                pixel_value.z += scene.materials[hit.material_id - 1].diffuse.z * light_intensity.z * max(0.0f, dotProduct(normal_vector, light_direction));
                             }
                         }
                         else{
-                            cout << "no shadow" << endl;
-                            pixel_value={255,255,255};
+                            //no shadow
+                            pixel_value.x += scene.materials[hit.material_id - 1].diffuse.x * light_intensity.x * max(0.0f, dotProduct(normal_vector, light_direction));
+                            pixel_value.y += scene.materials[hit.material_id - 1].diffuse.y * light_intensity.y * max(0.0f, dotProduct(normal_vector, light_direction));
+                            pixel_value.z += scene.materials[hit.material_id - 1].diffuse.z * light_intensity.z * max(0.0f, dotProduct(normal_vector, light_direction));
                         }
                     }
                     

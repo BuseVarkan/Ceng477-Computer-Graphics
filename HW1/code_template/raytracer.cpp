@@ -23,14 +23,25 @@ typedef struct Hit{
     int object_id;
 } hit;
 
-Vec3f normalization(const Vec3f vector){
+Vec3f normalization(const Vec3f &vector){
+    
+    
     float length = sqrt(vector.x*vector.x + vector.y*vector.y + vector.z*vector.z);
+    //cout << "len : " << length << endl;
+
     Vec3f normalized_vector = {vector.x/length, vector.y/length, vector.z/length};
+    //cout << "NormVector : " << normalized_vector.x << "-" << normalized_vector.y << "-" << normalized_vector.z << endl;
+    
     return normalized_vector;
 }
 
-Vec3f crossProduct(const Vec3f vector1, const Vec3f vector2){
+Vec3f crossProduct(const Vec3f &vector1, const Vec3f &vector2){
+    //cout << "Vector1 : " << vector1.x << " " << vector1.y << " " << vector1.z << endl;
+    //cout << "Vector2 : " << vector2.x << " " << vector2.y << " " << vector2.z << endl;
+
     Vec3f cross_product = {vector1.y*vector2.z - vector1.z*vector2.y, vector1.z*vector2.x - vector1.x*vector2.z, vector1.x*vector2.y - vector1.y*vector2.x};
+
+    //cout << "cross_product : " << cross_product.x << " " << cross_product.y << " " << cross_product.z << endl;
     return cross_product;
 }
 
@@ -177,14 +188,14 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
 
         
         if(detA != 0.0){
-            cout << detA << endl;
+            //cout << detA << endl;
             t = calculateDeterminant(a_minus_b, a_minus_c, a_minus_o) / detA;
             if(t>0){
                 float beta = calculateDeterminant(a_minus_o, a_minus_c, d) / detA;
                 if(beta >= 0 && beta <= 1){
                     float gamma = calculateDeterminant(a_minus_b, a_minus_o, d) / detA;
                     if(gamma >= 0 && gamma <= 1-beta){
-                        cout << "triangle hit" << endl;
+                        //cout << "triangle hit" << endl;
                         tri_hit.t = t;
                         tri_hit.intersection_point.x = o.x + t*d.x;
                         tri_hit.intersection_point.y = o.y + t*d.y;
@@ -370,17 +381,20 @@ int main(int argc, char* argv[])
 
         float left = camera.near_plane.x;
         float right = camera.near_plane.y;
-        float top = camera.near_plane.z;
-        float bottom = camera.near_plane.w;
+        float bottom = camera.near_plane.z;
+        float top = camera.near_plane.w;
         Vec3f normalized_gaze = normalization(camera.gaze);
+        //cout << "returned : " << normalized_gaze.x << " " << normalized_gaze.y << " " << normalized_gaze.z << endl;
+        
         Vec3f normalized_camera_v = normalization(camera.up);
         Vec3f normalized_camera_u = crossProduct(normalized_gaze, normalized_camera_v);
+        //cout << "return!!!! : " << normalized_camera_u.x << " " << normalized_camera_u.y << " " << normalized_camera_u.z << endl;
         Vec3f image_top_left;
         Vec3f image_plane_center;
 
-        image_plane_center.x=camera.position.x + (normalized_camera_u.x*left) + (normalized_camera_v.x*top);
-        image_plane_center.y=camera.position.y + (normalized_camera_u.y*left) + (normalized_camera_v.y*top);
-        image_plane_center.z=camera.position.z + (normalized_camera_u.z*left) + (normalized_camera_v.z*top);
+        image_plane_center.x=camera.position.x + (normalized_gaze.x*camera.near_distance);
+        image_plane_center.y=camera.position.y + (normalized_gaze.y*camera.near_distance);
+        image_plane_center.z=camera.position.z + (normalized_gaze.z*camera.near_distance);
 
         image_top_left.x=image_plane_center.x + (normalized_camera_u.x*left) + (normalized_camera_v.x*top);
         image_top_left.y=image_plane_center.y + (normalized_camera_u.y*left) + (normalized_camera_v.y*top);
@@ -410,6 +424,7 @@ int main(int argc, char* argv[])
                 else{
                     pixel_value={0,0,0};
                 }
+                
 
                 image[pixel_index] = pixel_value.x;
                 image[pixel_index+1] = pixel_value.y;

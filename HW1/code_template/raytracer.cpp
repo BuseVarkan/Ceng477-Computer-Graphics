@@ -438,24 +438,30 @@ int main(int argc, char* argv[])
                         shadow_ray.direction = light_direction;
                         shadow_ray.isShadow = true;
                         Hit shadow_hit = operateHit(scene, shadow_ray, triangle_normal_vectors, mesh_normal_vectors);
-                        if(shadow_hit.isHit){
-                            if(shadow_hit.t > 0 && shadow_hit.t < 1){
-                                // shadow
-                                
+                        if( (shadow_hit.isHit && (shadow_hit.t <= 0 && shadow_hit.t >= 1)) || !shadow_hit.isHit){
+                            //diffuse
+                            float distance_square = dotProduct(light_direction, light_direction);
+                            Vec3f irradiance = {light_intensity.x/distance_square, light_intensity.y/distance_square, light_intensity.z/distance_square};
+                            light_direction = normalization(light_direction);
+                            float dot_product = dotProduct(normal_vector, light_direction);
+                            if(dot_product > 0){
+                                pixel_value.x += scene.materials[hit.material_id - 1].diffuse.x * irradiance.x * dot_product;
+                                pixel_value.y += scene.materials[hit.material_id - 1].diffuse.y * irradiance.y * dot_product;
+                                pixel_value.z += scene.materials[hit.material_id - 1].diffuse.z * irradiance.z * dot_product;
                             }
-                            else{
-                                // no shadow
-                                pixel_value.x += scene.materials[hit.material_id - 1].diffuse.x * light_intensity.x * max(0.0f, dotProduct(normal_vector, light_direction));
-                                pixel_value.y += scene.materials[hit.material_id - 1].diffuse.y * light_intensity.y * max(0.0f, dotProduct(normal_vector, light_direction));
-                                pixel_value.z += scene.materials[hit.material_id - 1].diffuse.z * light_intensity.z * max(0.0f, dotProduct(normal_vector, light_direction));
+
+                            //specular
+                            Vec3f vector_h = normalization(subtractVectors(light_direction, ray.direction));
+                            float dot_product_hn = dotProduct(normal_vector, vector_h);
+                            if(dot_product_hn > 0){
+                                pixel_value.x += scene.materials[hit.material_id - 1].specular.x * irradiance.x * powf(dot_product_hn, scene.materials[hit.material_id - 1].phong_exponent);
+                                pixel_value.y += scene.materials[hit.material_id - 1].specular.y * irradiance.y * powf(dot_product_hn, scene.materials[hit.material_id - 1].phong_exponent);
+                                pixel_value.z += scene.materials[hit.material_id - 1].specular.z * irradiance.z * powf(dot_product_hn, scene.materials[hit.material_id - 1].phong_exponent);
                             }
+                            
+                            //mirror
                         }
-                        else{
-                            //no shadow
-                            pixel_value.x += scene.materials[hit.material_id - 1].diffuse.x * light_intensity.x * max(0.0f, dotProduct(normal_vector, light_direction));
-                            pixel_value.y += scene.materials[hit.material_id - 1].diffuse.y * light_intensity.y * max(0.0f, dotProduct(normal_vector, light_direction));
-                            pixel_value.z += scene.materials[hit.material_id - 1].diffuse.z * light_intensity.z * max(0.0f, dotProduct(normal_vector, light_direction));
-                        }
+                        
                     }
                     
                 }
@@ -465,10 +471,9 @@ int main(int argc, char* argv[])
                     pixel_value.z = scene.background_color.z;
                 }
                 
-                
-                image[pixel_index] = pixel_value.x;
-                image[pixel_index+1] = pixel_value.y;
-                image[pixel_index+2] = pixel_value.z;
+                image[pixel_index] = (pixel_value.x > 255) ? 255 : round(pixel_value.x);
+                image[pixel_index+1] = (pixel_value.y > 255) ? 255 : round(pixel_value.y);
+                image[pixel_index+2] = (pixel_value.z > 255) ? 255 : round(pixel_value.z);
                 pixel_index += 3;
             }
         }

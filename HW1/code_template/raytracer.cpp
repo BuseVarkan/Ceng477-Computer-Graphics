@@ -22,6 +22,10 @@ typedef struct Hit{
     Vec3f intersection_point;
     int material_id;
     int object_id;
+    // 0-> Triangle
+    // 1-> Sphere
+    // 2-> Mesh
+    int object_type;
 } hit;
 
 Vec3f normalization(const Vec3f &vector){
@@ -193,6 +197,7 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                         tri_hit.normal_vector = triange_normal_vectors[triangle_index];
                         tri_hit.material_id = current_triangle.material_id;
                         tri_hit.object_id = triangle_index;
+                        tri_hit.object_type = 0;
                         if((ray.isShadow == true)&& (tri_hit.t > 0) && (tri_hit.t < 1)){
                             return tri_hit;
                         }
@@ -251,7 +256,7 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
             sphere_hit.intersection_point.y = ray.origin.y + t*ray.direction.y;
             sphere_hit.intersection_point.z = ray.origin.z + t*ray.direction.z;
             sphere_hit.normal_vector = normalization(subtractVectors(sphere_hit.intersection_point, center)); //can be optimized with radius
-
+            sphere_hit.object_type = 1;
             sphere_hit.t = t;
             if((ray.isShadow == true) && (sphere_hit.t > 0) && (sphere_hit.t < 1)){
                 return sphere_hit;
@@ -312,6 +317,7 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                             face_hit.normal_vector = mesh_normal_vectors[mesh_index][face_index];
                             face_hit.material_id = current_triangle.material_id;
                             face_hit.object_id = mesh_index;
+                            face_hit.object_type = 2;
                             if((ray.isShadow == true) && (face_hit.t > 0) && (face_hit.t < 1)){
                                 return face_hit;
                             }
@@ -358,7 +364,111 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
     return hitResult;
 }
 
+Vec3f computeColor(const Scene &scene, const Ray &ray, const Hit &hit, int max_recursion_depth, vector<Vec3f>triangle_normal_vectors, vector<vector<Vec3f>>mesh_normal_vectors){
+    Vec3f pixel_value;
+    // add ambient
+    pixel_value.x = scene.materials[hit.material_id - 1].ambient.x * scene.ambient_light.x;
+    pixel_value.y = scene.materials[hit.material_id - 1].ambient.y * scene.ambient_light.y;
+    pixel_value.z = scene.materials[hit.material_id - 1].ambient.z * scene.ambient_light.z;
 
+
+    if(hit.isHit){
+        //create ray from object hit point+epsilon to the all lights, determine if shadow occurs
+            // if shadow true, pixel_value = ambient
+            // if shadow false, pixel_value = ambient + diffuse + specular 
+        Vec3f hit_point = hit.intersection_point;
+        Vec3f normal_vector = hit.normal_vector;
+        // add epsilon to hit point in normal vector direction
+        hit_point.x += scene.shadow_ray_epsilon*normal_vector.x;
+        hit_point.y += scene.shadow_ray_epsilon*normal_vector.y;
+        hit_point.z += scene.shadow_ray_epsilon*normal_vector.z;
+
+        Vec3f reflection;
+        reflection.x = 0;
+        reflection.y = 0;
+        reflection.z = 0;
+        if(max_recursion_depth>0 && scene.materials[hit.material_id - 1].is_mirror){
+            float dot_product_wi = -2 * dotProduct(normal_vector, ray.direction);
+            Vec3f normal_wi;
+            normal_wi.x = dot_product_wi * normal_vector.x + ray.direction.x;
+            normal_wi.y = dot_product_wi * normal_vector.y + ray.direction.y;
+            normal_wi.z = dot_product_wi * normal_vector.z + ray.direction.z;
+            normal_wi = normalization(normal_wi);
+
+            Vec3f epsilon;
+            epsilon.x = scene.shadow_ray_epsilon * normal_wi.x;
+            epsilon.y = scene.shadow_ray_epsilon * normal_wi.y;
+            epsilon.z = scene.shadow_ray_epsilon * normal_wi.z;
+
+            Ray reflection_ray;
+
+            hit_point.x += epsilon.x;
+            hit_point.y += epsilon.y;
+            hit_point.z += epsilon.z;
+
+            reflection_ray.origin = hit_point;
+            reflection_ray.direction = normal_wi;
+            reflection_ray.isShadow = false;
+
+            Hit reflection_hit = operateHit(scene, reflection_ray, triangle_normal_vectors, mesh_normal_vectors);
+
+            if(reflection_hit.isHit){
+                if(!(reflection_hit.object_id == hit.object_id && reflection_hit.object_type == hit.object_type)){
+                    reflection = computeColor(scene, reflection_ray, reflection_hit, max_recursion_depth-1, triangle_normal_vectors, mesh_normal_vectors);
+                }
+            }
+
+            pixel_value.x += scene.materials[hit.material_id - 1].mirror.x * reflection.x;
+            pixel_value.y += scene.materials[hit.material_id - 1].mirror.y * reflection.y;
+            pixel_value.z += scene.materials[hit.material_id - 1].mirror.z * reflection.z;
+
+        }
+        // for each point lights
+        for(int light_index=0; light_index<scene.point_lights.size(); light_index++){
+            PointLight current_light = scene.point_lights[light_index];
+            Vec3f light_position = current_light.position;
+            Vec3f light_intensity = current_light.intensity;
+            Vec3f light_direction = subtractVectors(light_position, hit_point);
+            Ray shadow_ray;
+            shadow_ray.origin = hit_point;
+            shadow_ray.direction = light_direction;
+            shadow_ray.isShadow = true;
+            Hit shadow_hit = operateHit(scene, shadow_ray, triangle_normal_vectors, mesh_normal_vectors);
+            if( (shadow_hit.isHit && (shadow_hit.t <= 0 && shadow_hit.t >= 1)) || !shadow_hit.isHit){
+                //diffuse
+                float distance_square = dotProduct(light_direction, light_direction);
+                Vec3f irradiance = {light_intensity.x/distance_square, light_intensity.y/distance_square, light_intensity.z/distance_square};
+                light_direction = normalization(light_direction);
+                float dot_product = dotProduct(normal_vector, light_direction);
+                if(dot_product > 0){
+                    pixel_value.x += scene.materials[hit.material_id - 1].diffuse.x * irradiance.x * dot_product;
+                    pixel_value.y += scene.materials[hit.material_id - 1].diffuse.y * irradiance.y * dot_product;
+                    pixel_value.z += scene.materials[hit.material_id - 1].diffuse.z * irradiance.z * dot_product;
+                }
+
+                //specular
+                Vec3f vector_h = normalization(subtractVectors(light_direction, ray.direction));
+                float dot_product_hn = dotProduct(normal_vector, vector_h);
+                if(dot_product_hn > 0){
+                    pixel_value.x += scene.materials[hit.material_id - 1].specular.x * irradiance.x * powf(dot_product_hn, scene.materials[hit.material_id - 1].phong_exponent);
+                    pixel_value.y += scene.materials[hit.material_id - 1].specular.y * irradiance.y * powf(dot_product_hn, scene.materials[hit.material_id - 1].phong_exponent);
+                    pixel_value.z += scene.materials[hit.material_id - 1].specular.z * irradiance.z * powf(dot_product_hn, scene.materials[hit.material_id - 1].phong_exponent);
+                }
+                
+                
+            }
+            
+        }
+        //mirror
+        
+    }
+    else{
+        pixel_value.x = scene.background_color.x;
+        pixel_value.y = scene.background_color.y;
+        pixel_value.z = scene.background_color.z;
+    }
+    return pixel_value;
+}
 int main(int argc, char* argv[])
 {
     // Sample usage for reading an XML scene file
@@ -401,7 +511,7 @@ int main(int argc, char* argv[])
         unsigned char* image = new unsigned char [camera.image_width * camera.image_height * 3];
 
         int pixel_index = 0;
-
+        Vec3f pixel_value;
         // FOR EACH PIXEL
         for(int i=0; i<camera.image_height; i++){
             for(int j=0; j<camera.image_width; j++){
@@ -409,67 +519,7 @@ int main(int argc, char* argv[])
                 Hit hit = operateHit(scene, ray, triangle_normal_vectors, mesh_normal_vectors);
 
 
-                Vec3f pixel_value;
-                // add ambient
-                pixel_value.x = scene.materials[hit.material_id - 1].ambient.x * scene.ambient_light.x;
-                pixel_value.y = scene.materials[hit.material_id - 1].ambient.y * scene.ambient_light.y;
-                pixel_value.z = scene.materials[hit.material_id - 1].ambient.z * scene.ambient_light.z;
-
-
-                if(hit.isHit){
-                    //create ray from object hit point+epsilon to the all lights, determine if shadow occurs
-                        // if shadow true, pixel_value = ambient
-                        // if shadow false, pixel_value = ambient + diffuse + specular 
-                    Vec3f hit_point = hit.intersection_point;
-                    Vec3f normal_vector = hit.normal_vector;
-                    // add epsilon to hit point in normal vector direction
-                    hit_point.x += scene.shadow_ray_epsilon*normal_vector.x;
-                    hit_point.y += scene.shadow_ray_epsilon*normal_vector.y;
-                    hit_point.z += scene.shadow_ray_epsilon*normal_vector.z;
-
-                    // for each point lights
-                    for(int light_index=0; light_index<scene.point_lights.size(); light_index++){
-                        PointLight current_light = scene.point_lights[light_index];
-                        Vec3f light_position = current_light.position;
-                        Vec3f light_intensity = current_light.intensity;
-                        Vec3f light_direction = subtractVectors(light_position, hit_point);
-                        Ray shadow_ray;
-                        shadow_ray.origin = hit_point;
-                        shadow_ray.direction = light_direction;
-                        shadow_ray.isShadow = true;
-                        Hit shadow_hit = operateHit(scene, shadow_ray, triangle_normal_vectors, mesh_normal_vectors);
-                        if( (shadow_hit.isHit && (shadow_hit.t <= 0 && shadow_hit.t >= 1)) || !shadow_hit.isHit){
-                            //diffuse
-                            float distance_square = dotProduct(light_direction, light_direction);
-                            Vec3f irradiance = {light_intensity.x/distance_square, light_intensity.y/distance_square, light_intensity.z/distance_square};
-                            light_direction = normalization(light_direction);
-                            float dot_product = dotProduct(normal_vector, light_direction);
-                            if(dot_product > 0){
-                                pixel_value.x += scene.materials[hit.material_id - 1].diffuse.x * irradiance.x * dot_product;
-                                pixel_value.y += scene.materials[hit.material_id - 1].diffuse.y * irradiance.y * dot_product;
-                                pixel_value.z += scene.materials[hit.material_id - 1].diffuse.z * irradiance.z * dot_product;
-                            }
-
-                            //specular
-                            Vec3f vector_h = normalization(subtractVectors(light_direction, ray.direction));
-                            float dot_product_hn = dotProduct(normal_vector, vector_h);
-                            if(dot_product_hn > 0){
-                                pixel_value.x += scene.materials[hit.material_id - 1].specular.x * irradiance.x * powf(dot_product_hn, scene.materials[hit.material_id - 1].phong_exponent);
-                                pixel_value.y += scene.materials[hit.material_id - 1].specular.y * irradiance.y * powf(dot_product_hn, scene.materials[hit.material_id - 1].phong_exponent);
-                                pixel_value.z += scene.materials[hit.material_id - 1].specular.z * irradiance.z * powf(dot_product_hn, scene.materials[hit.material_id - 1].phong_exponent);
-                            }
-                            
-                            //mirror
-                        }
-                        
-                    }
-                    
-                }
-                else{
-                    pixel_value.x = scene.background_color.x;
-                    pixel_value.y = scene.background_color.y;
-                    pixel_value.z = scene.background_color.z;
-                }
+                pixel_value = computeColor(scene, ray, hit, scene.max_recursion_depth,triangle_normal_vectors, mesh_normal_vectors);
                 
                 image[pixel_index] = (pixel_value.x > 255) ? 255 : round(pixel_value.x);
                 image[pixel_index+1] = (pixel_value.y > 255) ? 255 : round(pixel_value.y);

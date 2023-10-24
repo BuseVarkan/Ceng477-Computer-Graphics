@@ -24,24 +24,14 @@ typedef struct Hit{
 } hit;
 
 Vec3f normalization(const Vec3f &vector){
-    
-    
     float length = sqrt(vector.x*vector.x + vector.y*vector.y + vector.z*vector.z);
-    //cout << "len : " << length << endl;
-
     Vec3f normalized_vector = {vector.x/length, vector.y/length, vector.z/length};
-    //cout << "NormVector : " << normalized_vector.x << "-" << normalized_vector.y << "-" << normalized_vector.z << endl;
     
     return normalized_vector;
 }
 
 Vec3f crossProduct(const Vec3f &vector1, const Vec3f &vector2){
-    //cout << "Vector1 : " << vector1.x << " " << vector1.y << " " << vector1.z << endl;
-    //cout << "Vector2 : " << vector2.x << " " << vector2.y << " " << vector2.z << endl;
-
     Vec3f cross_product = {vector1.y*vector2.z - vector1.z*vector2.y, vector1.z*vector2.x - vector1.x*vector2.z, vector1.x*vector2.y - vector1.y*vector2.x};
-
-    //cout << "cross_product : " << cross_product.x << " " << cross_product.y << " " << cross_product.z << endl;
     return cross_product;
 }
 
@@ -188,14 +178,12 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
 
         
         if(detA != 0.0){
-            //cout << detA << endl;
             t = calculateDeterminant(a_minus_b, a_minus_c, a_minus_o) / detA;
             if(t>0){
                 float beta = calculateDeterminant(a_minus_o, a_minus_c, d) / detA;
                 if(beta >= 0 && beta <= 1){
                     float gamma = calculateDeterminant(a_minus_b, a_minus_o, d) / detA;
                     if(gamma >= 0 && gamma <= 1-beta){
-                        //cout << "triangle hit" << endl;
                         tri_hit.t = t;
                         tri_hit.intersection_point.x = o.x + t*d.x;
                         tri_hit.intersection_point.y = o.y + t*d.y;
@@ -347,7 +335,6 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                 all_mesh_hits.push_back(face_hit);
             }
         }
-        //cout << "all mesh hits size: " << all_mesh_hits.size() << endl;
         mesh_hit = findClosestHit(all_mesh_hits);
 
         if(mesh_hit.isHit && mesh_hit.t >= 0){
@@ -355,7 +342,6 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
         }
     }
 
-    //cout << "all hits size: " << all_hits.size() << endl;
     Hit hitResult = findClosestHit(all_hits);
 
     return hitResult;
@@ -368,7 +354,6 @@ int main(int argc, char* argv[])
     parser::Scene scene;
 
     scene.loadFromXml(argv[1]);
-    //std::cout<<scene.cameras[0].position.x<<std::endl;
 
     int camera_number = scene.cameras.size();
     vector<Vec3f> triangle_normal_vectors = calculateTrianglesNormalVectors(scene);
@@ -384,11 +369,8 @@ int main(int argc, char* argv[])
         float bottom = camera.near_plane.z;
         float top = camera.near_plane.w;
         Vec3f normalized_gaze = normalization(camera.gaze);
-        //cout << "returned : " << normalized_gaze.x << " " << normalized_gaze.y << " " << normalized_gaze.z << endl;
-        
         Vec3f normalized_camera_v = normalization(camera.up);
         Vec3f normalized_camera_u = crossProduct(normalized_gaze, normalized_camera_v);
-        //cout << "return!!!! : " << normalized_camera_u.x << " " << normalized_camera_u.y << " " << normalized_camera_u.z << endl;
         Vec3f image_top_left;
         Vec3f image_plane_center;
 
@@ -418,7 +400,6 @@ int main(int argc, char* argv[])
                 Vec3f pixel_value;
 
                 if(hit.isHit){
-                    cout<<"hit"<<endl;
                     pixel_value={255,255,255};
                 }
                 else{

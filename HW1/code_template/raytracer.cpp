@@ -314,7 +314,8 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                             face_hit.intersection_point.x = o.x + t*d.x;
                             face_hit.intersection_point.y = o.y + t*d.y;
                             face_hit.intersection_point.z = o.z + t*d.z;
-                            face_hit.normal_vector = mesh_normal_vectors[mesh_index][face_index];
+                            //face_hit.normal_vector = mesh_normal_vectors[mesh_index][face_index];
+                            face_hit.normal_vector = normalization(crossProduct(subtractVectors(v1, v0), subtractVectors(v2, v0)));
                             face_hit.material_id = current_triangle.material_id;
                             face_hit.object_id = mesh_index;
                             face_hit.object_type = 2;

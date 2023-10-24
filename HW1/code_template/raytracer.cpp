@@ -358,7 +358,7 @@ int main(int argc, char* argv[])
     int camera_number = scene.cameras.size();
     vector<Vec3f> triangle_normal_vectors = calculateTrianglesNormalVectors(scene);
     vector<vector<Vec3f>> mesh_normal_vectors = calculateMeshesNormalVectors(scene);
-
+ 
     // FOR EACH CAMERA
     for(int camera_index=0; camera_index<camera_number; camera_index++){
         
@@ -397,16 +397,62 @@ int main(int argc, char* argv[])
                 Ray ray = createRay(i, j, camera, image_top_left, px, py, normalized_camera_u, normalized_camera_v);
                 Hit hit = operateHit(scene, ray, triangle_normal_vectors, mesh_normal_vectors);
 
+
                 Vec3f pixel_value;
+                // add ambient
+                pixel_value.x = scene.materials[hit.material_id - 1].ambient.x * scene.ambient_light.x;
+                pixel_value.y = scene.materials[hit.material_id - 1].ambient.y * scene.ambient_light.y;
+                pixel_value.z = scene.materials[hit.material_id - 1].ambient.z * scene.ambient_light.z;
+
 
                 if(hit.isHit){
-                    pixel_value={255,255,255};
+                    //create ray from object hit point+epsilon to the all lights, determine if shadow occurs
+                        // if shadow true, pixel_value = ambient
+                        // if shadow false, pixel_value = ambient + diffuse + specular 
+                    Vec3f hit_point = hit.intersection_point;
+                    Vec3f normal_vector = hit.normal_vector;
+                    // add epsilon to hit point in normal vector direction
+                    hit_point.x += scene.shadow_ray_epsilon*normal_vector.x;
+                    hit_point.y += scene.shadow_ray_epsilon*normal_vector.y;
+                    hit_point.z += scene.shadow_ray_epsilon*normal_vector.z;
+
+                    // for each point lights
+                    for(int light_index=0; light_index<scene.point_lights.size(); light_index++){
+                        PointLight current_light = scene.point_lights[light_index];
+                        Vec3f light_position = current_light.position;
+                        Vec3f light_intensity = current_light.intensity;
+                        Vec3f light_direction = subtractVectors(light_position, hit_point);
+                        Ray shadow_ray;
+                        shadow_ray.origin = hit_point;
+                        shadow_ray.direction = light_direction;
+                        Hit shadow_hit = operateHit(scene, shadow_ray, triangle_normal_vectors, mesh_normal_vectors);
+                        if(shadow_hit.isHit){
+                            if(shadow_hit.t > 0 && shadow_hit.t < 1){
+                                // shadow
+                                cout << "shadow" << endl;
+                                // to see shadow, make it red
+                                pixel_value = {255,0,0};
+                            }
+                            else{
+                                // no shadow
+                                cout << "no shadow" << endl;
+                                pixel_value={255,255,255};
+                            }
+                        }
+                        else{
+                            cout << "no shadow" << endl;
+                            pixel_value={255,255,255};
+                        }
+                    }
+                    
                 }
                 else{
-                    pixel_value={0,0,0};
+                    pixel_value.x = scene.background_color.x;
+                    pixel_value.y = scene.background_color.y;
+                    pixel_value.z = scene.background_color.z;
                 }
                 
-
+                
                 image[pixel_index] = pixel_value.x;
                 image[pixel_index+1] = pixel_value.y;
                 image[pixel_index+2] = pixel_value.z;

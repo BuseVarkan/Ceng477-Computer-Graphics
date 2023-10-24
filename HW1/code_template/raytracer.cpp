@@ -462,10 +462,14 @@ Vec3f computeColor(const Scene &scene, const Ray &ray, const Hit &hit, int max_r
         //mirror
         
     }
-    else{
+    // first recursion
+    else if(max_recursion_depth == scene.max_recursion_depth){
         pixel_value.x = scene.background_color.x;
         pixel_value.y = scene.background_color.y;
         pixel_value.z = scene.background_color.z;
+    }
+    else{
+        return {0,0,0};
     }
     return pixel_value;
 }

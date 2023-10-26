@@ -66,7 +66,7 @@ Ray createRay(int i, int j, const Camera &camera, Vec3f image_top_left, float px
 }
 
 vector<Vec3f> calculateTrianglesNormalVectors(const Scene &scene){
-    vector<Vec3f> triange_normal_vectors;
+    vector<Vec3f> triangle_normal_vectors;
     int number_of_triangles = scene.triangles.size();
     Triangle current_triangle;
     Vec3f v0, v1, v2;
@@ -76,9 +76,9 @@ vector<Vec3f> calculateTrianglesNormalVectors(const Scene &scene){
         v1 = scene.vertex_data[current_triangle.indices.v1_id - 1];
         v2 = scene.vertex_data[current_triangle.indices.v2_id - 1];
         Vec3f normal_vector = normalization(crossProduct(subtractVectors(v1, v0), subtractVectors(v2, v0)));
-        triange_normal_vectors.push_back(normal_vector);
+        triangle_normal_vectors.push_back(normal_vector);
     }
-    return triange_normal_vectors;
+    return triangle_normal_vectors;
 }
 
 vector<vector<Vec3f>> calculateMeshesNormalVectors(const Scene &scene){
@@ -149,7 +149,7 @@ Hit findClosestHit(vector<Hit> &all_hits){
     return closest_hit;
 }
 
-Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_vectors, vector<vector<Vec3f>>mesh_normal_vectors){
+Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f> &triangle_normal_vectors, vector<vector<Vec3f>> &mesh_normal_vectors){
     Triangle current_triangle;
     Mesh current_mesh;
     Sphere current_sphere;
@@ -194,7 +194,8 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                         tri_hit.intersection_point.x = o.x + t*d.x;
                         tri_hit.intersection_point.y = o.y + t*d.y;
                         tri_hit.intersection_point.z = o.z + t*d.z;
-                        tri_hit.normal_vector = triange_normal_vectors[triangle_index];
+                        //tri_hit.normal_vector = triangle_normal_vectors[triangle_index];
+                        tri_hit.normal_vector = normalization(crossProduct(subtractVectors(v1, v0), subtractVectors(v2, v0)));
                         tri_hit.material_id = current_triangle.material_id;
                         tri_hit.object_id = triangle_index;
                         tri_hit.object_type = 0;
@@ -261,14 +262,15 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
             if((ray.isShadow == true) && (sphere_hit.t > 0) && (sphere_hit.t < 1)){
                 return sphere_hit;
             }
+            
         }
         else{
             sphere_hit.isHit = false;
         }
-
         if(sphere_hit.isHit && sphere_hit.t >= 0){
             all_hits.push_back(sphere_hit);
         }
+        
     }
 
 
@@ -322,6 +324,7 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
                             if((ray.isShadow == true) && (face_hit.t > 0) && (face_hit.t < 1)){
                                 return face_hit;
                             }
+                            
                         }
                         else{
                             face_hit.isHit=false;
@@ -339,19 +342,18 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
             else{
                 face_hit.isHit=false;
             }
-
-            if(face_hit.isHit && face_hit.t >= 0)
-            {
+            if(face_hit.isHit && face_hit.t >= 0){
                 face_hit.material_id = current_mesh.material_id;
                 //face_hit.objType = MESH;
                 face_hit.object_id = mesh_index;
                 face_hit.intersection_point.x = o.x + t*d.x;
                 face_hit.intersection_point.y = o.y + t*d.y;
                 face_hit.intersection_point.z = o.z + t*d.z;
-                face_hit.normal_vector = mesh_normal_vectors[mesh_index][face_index];
-
+                //face_hit.normal_vector = mesh_normal_vectors[mesh_index][face_index];
+                face_hit.normal_vector = normalization(crossProduct(subtractVectors(v1, v0), subtractVectors(v2, v0)));
                 all_mesh_hits.push_back(face_hit);
             }
+            
         }
         mesh_hit = findClosestHit(all_mesh_hits);
 
@@ -365,15 +367,18 @@ Hit operateHit(const Scene &scene, const Ray &ray, vector<Vec3f>triange_normal_v
     return hitResult;
 }
 
-Vec3f computeColor(const Scene &scene, const Ray &ray, const Hit &hit, int max_recursion_depth, vector<Vec3f>triangle_normal_vectors, vector<vector<Vec3f>>mesh_normal_vectors){
+Vec3f computeColor(const Scene &scene, const Ray &ray, const Hit &hit, int max_recursion_depth, vector<Vec3f>&triangle_normal_vectors, vector<vector<Vec3f>>&mesh_normal_vectors){
     Vec3f pixel_value;
     // add ambient
-    pixel_value.x = scene.materials[hit.material_id - 1].ambient.x * scene.ambient_light.x;
-    pixel_value.y = scene.materials[hit.material_id - 1].ambient.y * scene.ambient_light.y;
-    pixel_value.z = scene.materials[hit.material_id - 1].ambient.z * scene.ambient_light.z;
-
+    pixel_value.x = 0;
+    pixel_value.y = 0;
+    pixel_value.z = 0;
 
     if(hit.isHit){
+        // add ambient 
+        pixel_value.x = scene.materials[hit.material_id - 1].ambient.x * scene.ambient_light.x;
+        pixel_value.y = scene.materials[hit.material_id - 1].ambient.y * scene.ambient_light.y;
+        pixel_value.z = scene.materials[hit.material_id - 1].ambient.z * scene.ambient_light.z;
         //create ray from object hit point+epsilon to the all lights, determine if shadow occurs
             // if shadow true, pixel_value = ambient
             // if shadow false, pixel_value = ambient + diffuse + specular 
@@ -414,9 +419,7 @@ Vec3f computeColor(const Scene &scene, const Ray &ray, const Hit &hit, int max_r
             Hit reflection_hit = operateHit(scene, reflection_ray, triangle_normal_vectors, mesh_normal_vectors);
 
             if(reflection_hit.isHit){
-                if(!(reflection_hit.object_id == hit.object_id && reflection_hit.object_type == hit.object_type)){
-                    reflection = computeColor(scene, reflection_ray, reflection_hit, max_recursion_depth-1, triangle_normal_vectors, mesh_normal_vectors);
-                }
+                reflection = computeColor(scene, reflection_ray, reflection_hit, max_recursion_depth-1, triangle_normal_vectors, mesh_normal_vectors);
             }
 
             pixel_value.x += scene.materials[hit.material_id - 1].mirror.x * reflection.x;
@@ -460,11 +463,12 @@ Vec3f computeColor(const Scene &scene, const Ray &ray, const Hit &hit, int max_r
             }
             
         }
-        //mirror
+        
         
     }
     // first recursion
     else if(max_recursion_depth == scene.max_recursion_depth){
+        // primary ray, no hit
         pixel_value.x = scene.background_color.x;
         pixel_value.y = scene.background_color.y;
         pixel_value.z = scene.background_color.z;
